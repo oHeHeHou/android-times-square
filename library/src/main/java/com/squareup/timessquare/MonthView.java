@@ -93,7 +93,7 @@ public class MonthView extends LinearLayout {
     grid = (CalendarGridView) findViewById(R.id.calendar_grid);
   }
 
-  public void init(MonthDescriptor month, List<List<MonthCellDescriptor>> cells,
+  public void init(List<CalendarCellView> selectedCellViews, MonthDescriptor month, List<List<MonthCellDescriptor>> cells,
       boolean displayOnly, Typeface titleTypeface, Typeface dateTypeface) {
     Logr.d("Initializing MonthView (%d) for %s", System.identityHashCode(this), month);
     long start = System.currentTimeMillis();
@@ -125,6 +125,11 @@ public class MonthView extends LinearLayout {
           cellView.setRangeState(cell.getRangeState());
           cellView.setHighlighted(cell.isHighlighted());
           cellView.setTag(cell);
+
+          //如果初始化时被选中，则记录
+          if (cell.isSelected()) {
+            selectedCellViews.add(cellView);
+          }
 
           if (null != decorators) {
             for (CalendarCellDecorator decorator : decorators) {
@@ -172,6 +177,7 @@ public class MonthView extends LinearLayout {
   }
 
   public interface Listener {
-    void handleClick(MonthCellDescriptor cell);
+    //    void handleClick(MonthCellDescriptor cell);
+    void handleClick(CalendarCellView cell);
   }
 }

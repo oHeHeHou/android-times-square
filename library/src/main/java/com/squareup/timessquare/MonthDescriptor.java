@@ -47,4 +47,16 @@ class MonthDescriptor {
         + year
         + '}';
   }
+
+    //通过toString()判断2个MonthDescriptor是否相等
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof MonthDescriptor) {
+            MonthDescriptor other = (MonthDescriptor) o;
+            if (other.toString().equals(this.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
