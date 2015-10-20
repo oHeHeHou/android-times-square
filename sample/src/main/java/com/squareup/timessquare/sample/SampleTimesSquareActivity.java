@@ -24,7 +24,7 @@ import java.util.Set;
 import static android.widget.Toast.LENGTH_SHORT;
 
 public class SampleTimesSquareActivity extends Activity {
-  private static final String TAG = "SampleTimesSquareActivi";
+    private static final String TAG = "SampleTimesSquareActivity";
   private CalendarSlideView calendar;
   private AlertDialog theDialog;
   private CalendarSlideView dialogView;
@@ -32,7 +32,7 @@ public class SampleTimesSquareActivity extends Activity {
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    setContentView(R.layout.sample_calendar_picker2);
+      setContentView(R.layout.sample_calendar_picker);
 
     final Calendar nextYear = Calendar.getInstance();
     nextYear.add(Calendar.YEAR, 1);
@@ -95,7 +95,7 @@ public class SampleTimesSquareActivity extends Activity {
         }
         calendar.setDecorators(Collections.<CalendarCellDecorator>emptyList());
         calendar.init(new Date(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.MULTIPLE) //
+                .inMode(CalendarSlideView.SelectionMode.MULTIPLE)
             .withSelectedDates(dates);
 
       }
@@ -113,8 +113,8 @@ public class SampleTimesSquareActivity extends Activity {
         dates.add(today.getTime());
         calendar.setDecorators(Collections.<CalendarCellDecorator>emptyList());
         calendar.init(new Date(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.RANGE) //
-            .withSelectedDates(dates);
+                .inMode(CalendarSlideView.SelectionMode.RANGE); //
+//            .withSelectedDates(dates);
       }
     });
 

@@ -9,10 +9,12 @@ import android.graphics.Typeface;
 import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.text.DateFormat;
@@ -61,7 +63,6 @@ public class CalendarSlideView extends ViewPager {
          */
         RANGE
     }
-
     private final CalendarSlideView.MonthAdapter adapter;
     private final List<List<List<MonthCellDescriptor>>> cells =
             new ArrayList<List<List<MonthCellDescriptor>>>();
@@ -69,8 +70,6 @@ public class CalendarSlideView extends ViewPager {
     final List<MonthDescriptor> months = new ArrayList<MonthDescriptor>();
     final List<MonthCellDescriptor> selectedCells = new ArrayList<MonthCellDescriptor>();
     final List<MonthCellDescriptor> highlightedCells = new ArrayList<MonthCellDescriptor>();
-    //
-    List<CalendarCellView> selectedCellViews = new ArrayList<CalendarCellView>();
     final List<Calendar> selectedCals = new ArrayList<Calendar>();
     final List<Calendar> highlightedCals = new ArrayList<Calendar>();
     private Locale locale = Locale.CHINA;
@@ -334,8 +333,6 @@ public class CalendarSlideView extends ViewPager {
             setAdapter(adapter);
         }
         adapter.notifyDataSetChanged();
-        //重新生成Pager中的MonthView
-        //MonthView.invalidate();
     }
 
     private void scrollToSelectedMonth(final int selectedIndex) {
@@ -499,9 +496,8 @@ public class CalendarSlideView extends ViewPager {
 
     private class CellClickedListener implements MonthView.Listener {
         @Override
-        public void handleClick(CalendarCellView cell) {
-            MonthCellDescriptor descriptor = (MonthCellDescriptor) cell.getTag();
-            Date clickedDate = descriptor.getDate();
+        public void handleClick(MonthCellDescriptor cell) {
+            Date clickedDate = cell.getDate();
 
             if (cellClickInterceptor != null && cellClickInterceptor.onCellClicked(clickedDate)) {
                 return;
@@ -511,8 +507,7 @@ public class CalendarSlideView extends ViewPager {
                     invalidDateListener.onInvalidDateSelected(clickedDate);
                 }
             } else {
-//                boolean wasSelected = doSelectDate(clickedDate, descriptor);
-                boolean wasSelected = doSelectDate(clickedDate, descriptor, cell);
+                boolean wasSelected = doSelectDate(clickedDate, cell);
 
                 if (dateListener != null) {
                     if (wasSelected) {
@@ -558,7 +553,7 @@ public class CalendarSlideView extends ViewPager {
         if (monthCellWithMonthIndex == null || !isDateSelectable(date)) {
             return false;
         }
-        boolean wasSelected = doSelectDate(date, monthCellWithMonthIndex.cell, null);
+        boolean wasSelected = doSelectDate(date, monthCellWithMonthIndex.cell);
 //        if (wasSelected) {
 //            scrollToSelectedMonth(monthCellWithMonthIndex.monthIndex, smoothScroll);
 //        }
@@ -577,7 +572,7 @@ public class CalendarSlideView extends ViewPager {
         }
     }
 
-    private boolean doSelectDate(Date date, MonthCellDescriptor cellDesc, CalendarCellView cellView) {
+    private boolean doSelectDate(Date date, MonthCellDescriptor cell) {
         Calendar newlySelectedCal = Calendar.getInstance(locale);
         newlySelectedCal.setTime(date);
         // Sanitize input: clear out the hours/minutes/seconds/millis.
@@ -605,10 +600,6 @@ public class CalendarSlideView extends ViewPager {
 
             case SINGLE:
                 clearOldSelections();
-                //设置单击选中状态并取消之前的选中状态
-                if (cellView != null) {
-                    cellView.setSelected(true);
-                }
                 break;
             default:
                 throw new IllegalStateException("Unknown selectionMode " + selectionMode);
@@ -616,14 +607,11 @@ public class CalendarSlideView extends ViewPager {
 
         if (date != null) {
             // Select a new cell.
-            if (selectedCells.size() == 0 || !selectedCells.get(0).equals(cellDesc)) {
-                selectedCells.add(cellDesc);
-                cellDesc.setSelected(true);
+            if (selectedCells.size() == 0 || !selectedCells.get(0).equals(cell)) {
+                selectedCells.add(cell);
+                cell.setSelected(true);
             }
             selectedCals.add(newlySelectedCal);
-            if (cellView != null) {
-                selectedCellViews.add(cellView);
-            }
 
             if (selectionMode == SelectionMode.RANGE && selectedCells.size() > 1) {
                 // Select all days in between start and end.
@@ -653,6 +641,7 @@ public class CalendarSlideView extends ViewPager {
         return date != null;
     }
 
+
     private void clearOldSelections() {
         for (MonthCellDescriptor selectedCell : selectedCells) {
             // De-select the currently-selected cell.
@@ -673,12 +662,6 @@ public class CalendarSlideView extends ViewPager {
         }
         selectedCells.clear();
         selectedCals.clear();
-
-        //清除选择状态
-        for (CalendarCellView selectedCellView : selectedCellViews) {
-            selectedCellView.setSelected(false);
-        }
-        selectedCellViews.clear();
     }
 
     private Date applyMultiSelect(Date date, Calendar selectedCal) {
@@ -699,6 +682,7 @@ public class CalendarSlideView extends ViewPager {
         }
         return date;
     }
+
 
     public void highlightDates(Collection<Date> dates) {
         for (Date date : dates) {
@@ -961,11 +945,26 @@ public class CalendarSlideView extends ViewPager {
      */
     private class MonthAdapter extends PagerAdapter {
         private final LayoutInflater inflater;
+        private int mChildCount = 0;
 
         public MonthAdapter(Context context) {
             inflater = LayoutInflater.from(context);
         }
 
+        @Override
+        public int getItemPosition(Object object) {
+            if (mChildCount > 0) {
+                mChildCount--;
+                return POSITION_NONE;
+            }
+            return super.getItemPosition(object);
+        }
+
+        @Override
+        public void notifyDataSetChanged() {
+            mChildCount = getCount();
+            super.notifyDataSetChanged();
+        }
 
         @Override
         public int getCount() {
@@ -991,7 +990,7 @@ public class CalendarSlideView extends ViewPager {
                             headerTextColor, decorators, locale);
 //            monthView.init(months.get(position), cells.get(position), displayOnly, titleTypeface,
 //                    dateTypeface);
-            monthView.init(selectedCellViews, months.get(position), cells.get(position), displayOnly, titleTypeface,
+            monthView.init(months.get(position), cells.get(position), displayOnly, titleTypeface,
                     dateTypeface);
 
             container.addView(monthView, 0);
@@ -1007,6 +1006,6 @@ public class CalendarSlideView extends ViewPager {
                 monthNameFormat.format(today.getTime()));
         int index = months.indexOf(todayDesc) == -1 ? 0 :
                 months.indexOf(todayDesc);
-        setCurrentItem(index);
+        setCurrentItem(index, false);
     }
 }
