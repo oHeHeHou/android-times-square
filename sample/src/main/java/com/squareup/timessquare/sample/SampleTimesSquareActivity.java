@@ -11,6 +11,7 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.Toast;
 import com.squareup.timessquare.CalendarCellDecorator;
+import com.squareup.timessquare.CalendarPickerView;
 import com.squareup.timessquare.CalendarSlideView;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,7 +26,7 @@ import static android.widget.Toast.LENGTH_SHORT;
 
 public class SampleTimesSquareActivity extends Activity {
     private static final String TAG = "SampleTimesSquareActivity";
-  private CalendarSlideView calendar;
+    private CalendarPickerView calendar;
   private AlertDialog theDialog;
   private CalendarSlideView dialogView;
   private final Set<Button> modeButtons = new LinkedHashSet<Button>();
@@ -40,12 +41,12 @@ public class SampleTimesSquareActivity extends Activity {
     final Calendar lastYear = Calendar.getInstance();
     lastYear.add(Calendar.YEAR, -1);
 
-    calendar = (CalendarSlideView) findViewById(R.id.calendar_view);
+      calendar = (CalendarPickerView) findViewById(R.id.calendar_view);
     calendar.init(lastYear.getTime(), nextYear.getTime()) //
-            .inMode(CalendarSlideView.SelectionMode.SINGLE) //
+            .inMode(CalendarPickerView.SelectionMode.SINGLE) //
         .withSelectedDate(new Date());
 
-    calendar.setOnDateSelectedListener(new CalendarSlideView.OnDateSelectedListener() {
+      calendar.setOnDateSelectedListener(new CalendarPickerView.OnDateSelectedListener() {
       @Override
       public void onDateSelected(Date date) {
         Toast.makeText(SampleTimesSquareActivity.this, "!!!!!!", Toast.LENGTH_SHORT).show();
@@ -77,7 +78,7 @@ public class SampleTimesSquareActivity extends Activity {
 
         calendar.setDecorators(Collections.<CalendarCellDecorator>emptyList());
         calendar.init(lastYear.getTime(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.SINGLE) //
+                .inMode(CalendarPickerView.SelectionMode.SINGLE) //
                 .withSelectedDate(new Date());
 
       }
@@ -95,7 +96,7 @@ public class SampleTimesSquareActivity extends Activity {
         }
         calendar.setDecorators(Collections.<CalendarCellDecorator>emptyList());
         calendar.init(new Date(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.MULTIPLE)
+                .inMode(CalendarPickerView.SelectionMode.MULTIPLE)
             .withSelectedDates(dates);
 
       }
@@ -113,7 +114,7 @@ public class SampleTimesSquareActivity extends Activity {
         dates.add(today.getTime());
         calendar.setDecorators(Collections.<CalendarCellDecorator>emptyList());
         calendar.init(new Date(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.RANGE); //
+                .inMode(CalendarPickerView.SelectionMode.RANGE); //
 //            .withSelectedDates(dates);
       }
     });
@@ -124,7 +125,7 @@ public class SampleTimesSquareActivity extends Activity {
 
         calendar.setDecorators(Collections.<CalendarCellDecorator>emptyList());
         calendar.init(new Date(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.SINGLE) //
+                .inMode(CalendarPickerView.SelectionMode.SINGLE) //
             .withSelectedDate(new Date()) //
             .displayOnly();
       }
@@ -153,7 +154,7 @@ public class SampleTimesSquareActivity extends Activity {
 
         calendar.setDecorators(Arrays.<CalendarCellDecorator>asList(new SampleDecorator()));
         calendar.init(lastYear.getTime(), nextYear.getTime()) //
-                .inMode(CalendarSlideView.SelectionMode.SINGLE) //
+                .inMode(CalendarPickerView.SelectionMode.SINGLE) //
             .withSelectedDate(new Date());
       }
     });

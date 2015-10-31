@@ -5,15 +5,20 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AbsListView;
+import android.view.WindowManager;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
+
 import java.text.DateFormat;
 import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
@@ -36,12 +41,17 @@ import static java.util.Calendar.MONTH;
 import static java.util.Calendar.SECOND;
 import static java.util.Calendar.YEAR;
 
-/***
- * 可以左右滑动的日历
+/**
+ *
  */
-public class CalendarSlideView extends ViewPager {
+public class CalendarPickerView extends LinearLayout {
+
 
     public enum SelectionMode {
+        /**
+         * Only one date will be selectable.  If there is already a selected date and you select a new
+         * one, the old date will be unselected.
+         */
         /**
          * Only one date will be selectable.  If there is already a selected date and you select a new
          * one, the old date will be unselected.
@@ -53,13 +63,15 @@ public class CalendarSlideView extends ViewPager {
         MULTIPLE,
         /**
          * Allows you to select a date range.  Previous selections are cleared when you either:
+         * <ul>
          * <li>Have a range selected and select another date (even if it's in the current range).</li>
          * <li>Have one date selected and then select an earlier date.</li>
          * </ul>
          */
         RANGE
     }
-    private final CalendarSlideView.MonthAdapter adapter;
+
+    private final MonthAdapter adapter;
     private final List<List<List<MonthCellDescriptor>>> cells =
             new ArrayList<List<List<MonthCellDescriptor>>>();
     final MonthView.Listener listener = new CellClickedListener();
@@ -94,6 +106,10 @@ public class CalendarSlideView extends ViewPager {
     private CellClickInterceptor cellClickInterceptor;
     private List<CalendarCellDecorator> decorators;
 
+    private CalendarSlideView calendarSlideView;
+    private TextView title;
+
+
     public void setDecorators(List<CalendarCellDecorator> decorators) {
         this.decorators = decorators;
         if (null != adapter) {
@@ -101,12 +117,7 @@ public class CalendarSlideView extends ViewPager {
         }
     }
 
-    public List<CalendarCellDecorator> getDecorators() {
-        return decorators;
-    }
-
-
-    public CalendarSlideView(Context context, AttributeSet attrs) {
+    public CalendarPickerView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
         Resources res = context.getResources();
@@ -125,10 +136,8 @@ public class CalendarSlideView extends ViewPager {
         headerTextColor = a.getColor(R.styleable.CalendarPickerView_tsquare_headerTextColor,
                 res.getColor(R.color.calendar_text_active));
         a.recycle();
-
-        adapter = new MonthAdapter(context);
+        setOrientation(VERTICAL);
         setBackgroundColor(bg);
-//        locale = Locale.getDefault();
         today = Calendar.getInstance(locale);
         minCal = Calendar.getInstance(locale);
         maxCal = Calendar.getInstance(locale);
@@ -137,6 +146,42 @@ public class CalendarSlideView extends ViewPager {
         weekdayNameFormat = new SimpleDateFormat(context.getString(R.string.day_name_format), locale);
         fullDateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, locale);
 
+        //日期标题
+        title = new TextView(context);
+        LayoutParams params = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.CENTER_HORIZONTAL;
+        params.bottomMargin = context.getResources().getDimensionPixelSize(R.dimen.calendar_month_topmargin);
+        params.topMargin = context.getResources().getDimensionPixelSize(R.dimen.calendar_month_title_bottommargin);
+        ;
+        title.setLayoutParams(params);
+        title.setTextColor(Color.BLACK);
+        title.setGravity(Gravity.CENTER);
+        title.setTextAppearance(context, R.style.CalendarTitle);
+        addView(title);
+//
+        adapter = new MonthAdapter(context);
+        calendarSlideView = new CalendarSlideView(context);
+        calendarSlideView.setAdapter(adapter);
+        calendarSlideView.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
+            }
+
+            @Override
+            public void onPageSelected(int position) {
+                title.setText(months.get(position).getLabel());
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+
+            }
+        });
+        addView(calendarSlideView);
+
+/*
+
         if (isInEditMode()) {
             Calendar nextYear = Calendar.getInstance(locale);
             nextYear.add(Calendar.YEAR, 1);
@@ -144,6 +189,8 @@ public class CalendarSlideView extends ViewPager {
             init(new Date(), nextYear.getTime()) //
                     .withSelectedDate(new Date());
         }
+
+*/
     }
 
     /**
@@ -258,455 +305,16 @@ public class CalendarSlideView extends ViewPager {
         return init(minDate, maxDate, locale);
     }
 
-    public class FluentInitializer {
-        /**
-         * Override the {@link SelectionMode} from the default ({@link SelectionMode#SINGLE}).
-         */
-        public FluentInitializer inMode(SelectionMode mode) {
-            selectionMode = mode;
-            validateAndUpdate();
-            return this;
-        }
-
-        /**
-         * Set an initially-selected date.  The calendar will scroll to that date if it's not already
-         * visible.
-         */
-        public FluentInitializer withSelectedDate(Date selectedDates) {
-            return withSelectedDates(Arrays.asList(selectedDates));
-        }
-
-        /**
-         * Set multiple selected dates.  This will throw an {@link IllegalArgumentException} if you
-         * pass in multiple dates and haven't already called {@link #inMode(SelectionMode)}.
-         */
-        public FluentInitializer withSelectedDates(Collection<Date> selectedDates) {
-            if (selectionMode == SelectionMode.SINGLE && selectedDates.size() > 1) {
-                throw new IllegalArgumentException("SINGLE mode can't be used with multiple selectedDates");
-            }
-            if (selectionMode == SelectionMode.RANGE && selectedDates.size() > 2) {
-                throw new IllegalArgumentException(
-                        "RANGE mode only allows two selectedDates.  You tried to pass " + selectedDates.size());
-            }
-            if (selectedDates != null) {
-                for (Date date : selectedDates) {
-                    selectDate(date);
-                }
-            }
-            scrollToSelectedDates();
-
-            validateAndUpdate();
-
-            return this;
-        }
-
-        public FluentInitializer withHighlightedDates(Collection<Date> dates) {
-            highlightDates(dates);
-            return this;
-        }
-
-        public FluentInitializer withHighlightedDate(Date date) {
-            return withHighlightedDates(Arrays.asList(date));
-        }
-
-        @SuppressLint("SimpleDateFormat")
-        public FluentInitializer setShortWeekdays(String[] newShortWeekdays) {
-            DateFormatSymbols symbols = new DateFormatSymbols(locale);
-            symbols.setShortWeekdays(newShortWeekdays);
-            weekdayNameFormat =
-                    new SimpleDateFormat(getContext().getString(R.string.day_name_format), symbols);
-            return this;
-        }
-
-        public FluentInitializer displayOnly() {
-            displayOnly = true;
-            return this;
-        }
-    }
-
-    private void validateAndUpdate() {
-        if (getAdapter() == null) {
-            setAdapter(adapter);
-        }
-        adapter.notifyDataSetChanged();
-    }
-
-    private void scrollToSelectedMonth(final int selectedIndex) {
-        scrollToSelectedMonth(selectedIndex, false);
-    }
-
-    private void scrollToSelectedMonth(final int selectedIndex, final boolean smoothScroll) {
-        post(new Runnable() {
-            @Override
-            public void run() {
-                Logr.d("Scrolling to position %d", selectedIndex);
-
-                if (smoothScroll) {
-//                    smoothScrollToPosition(selectedIndex);
-                } else {
-//                    setSelection(selectedIndex);
-                }
-            }
-        });
-    }
-
-    private void scrollToSelectedDates() {
-        Integer selectedIndex = null;
-        Integer todayIndex = null;
-        Calendar today = Calendar.getInstance(locale);
-        for (int c = 0; c < months.size(); c++) {
-            MonthDescriptor month = months.get(c);
-            if (selectedIndex == null) {
-                for (Calendar selectedCal : selectedCals) {
-                    if (sameMonth(selectedCal, month)) {
-                        selectedIndex = c;
-                        break;
-                    }
-                }
-                if (selectedIndex == null && todayIndex == null && sameMonth(today, month)) {
-                    todayIndex = c;
-                }
-            }
-        }
-        if (selectedIndex != null) {
-            scrollToSelectedMonth(selectedIndex);
-        } else if (todayIndex != null) {
-            scrollToSelectedMonth(todayIndex);
-        }
-    }
-
-    public boolean scrollToDate(Date date) {
-        Integer selectedIndex = null;
-
-        Calendar cal = Calendar.getInstance(locale);
-        cal.setTime(date);
-        for (int c = 0; c < months.size(); c++) {
-            MonthDescriptor month = months.get(c);
-            if (sameMonth(cal, month)) {
-                selectedIndex = c;
-                break;
-            }
-        }
-        if (selectedIndex != null) {
-            scrollToSelectedMonth(selectedIndex);
-            return true;
-        }
-        return false;
-    }
-
     /**
-     * This method should only be called if the calendar is contained in a dialog, and it should only
-     * be called once, right after the dialog is shown (using
-     * {@link android.content.DialogInterface.OnShowListener} or
-     * {@link android.app.DialogFragment#onStart()}).
+     * 跳转到当前月份
      */
-    public void fixDialogDimens() {
-        Logr.d("Fixing dimensions to h = %d / w = %d", getMeasuredHeight(), getMeasuredWidth());
-        // Fix the layout height/width after the dialog has been shown.
-        getLayoutParams().height = getMeasuredHeight();
-        getLayoutParams().width = getMeasuredWidth();
-        // Post this runnable so it runs _after_ the dimen changes have been applied/re-measured.
-        post(new Runnable() {
-            @Override
-            public void run() {
-                Logr.d("Dimens are fixed: now scroll to the selected date");
-                scrollToSelectedDates();
-            }
-        });
-    }
-
-    /**
-     * Set the typeface to be used for month titles.
-     */
-    public void setTitleTypeface(Typeface titleTypeface) {
-        this.titleTypeface = titleTypeface;
-        validateAndUpdate();
-    }
-
-    /**
-     * Sets the typeface to be used within the date grid.
-     */
-    public void setDateTypeface(Typeface dateTypeface) {
-        this.dateTypeface = dateTypeface;
-        validateAndUpdate();
-    }
-
-    /**
-     * Sets the typeface to be used for all text within this calendar.
-     */
-    public void setTypeface(Typeface typeface) {
-        setTitleTypeface(typeface);
-        setDateTypeface(typeface);
-    }
-
-    /**
-     * This method should only be called if the calendar is contained in a dialog, and it should only
-     * be called when the screen has been rotated and the dialog should be re-measured.
-     */
-    public void unfixDialogDimens() {
-        Logr.d("Reset the fixed dimensions to allow for re-measurement");
-        // Fix the layout height/width after the dialog has been shown.
-        getLayoutParams().height = AbsListView.LayoutParams.MATCH_PARENT;
-        getLayoutParams().width = AbsListView.LayoutParams.MATCH_PARENT;
-        requestLayout();
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (months.isEmpty()) {
-            throw new IllegalStateException(
-                    "Must have at least one month to display.  Did you forget to call init()?");
-        }
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-    }
-
-    public Date getSelectedDate() {
-        return (selectedCals.size() > 0 ? selectedCals.get(0).getTime() : null);
-    }
-
-    public List<Date> getSelectedDates() {
-        List<Date> selectedDates = new ArrayList<Date>();
-        for (MonthCellDescriptor cal : selectedCells) {
-            selectedDates.add(cal.getDate());
-        }
-        Collections.sort(selectedDates);
-        return selectedDates;
-    }
-
-    /**
-     * Returns a string summarizing what the client sent us for init() params.
-     */
-    private static String dbg(Date minDate, Date maxDate) {
-        return "minDate: " + minDate + "\nmaxDate: " + maxDate;
-    }
-
-    /**
-     * Clears out the hours/minutes/seconds/millis of a Calendar.
-     */
-    static void setMidnight(Calendar cal) {
-        cal.set(HOUR_OF_DAY, 0);
-        cal.set(MINUTE, 0);
-        cal.set(SECOND, 0);
-        cal.set(MILLISECOND, 0);
-    }
-
-    private class CellClickedListener implements MonthView.Listener {
-        @Override
-        public void handleClick(MonthCellDescriptor cell) {
-            Date clickedDate = cell.getDate();
-
-            if (cellClickInterceptor != null && cellClickInterceptor.onCellClicked(clickedDate)) {
-                return;
-            }
-            if (!betweenDates(clickedDate, minCal, maxCal) || !isDateSelectable(clickedDate)) {
-                if (invalidDateListener != null) {
-                    invalidDateListener.onInvalidDateSelected(clickedDate);
-                }
-            } else {
-                boolean wasSelected = doSelectDate(clickedDate, cell);
-
-                if (dateListener != null) {
-                    if (wasSelected) {
-                        dateListener.onDateSelected(clickedDate);
-                    } else {
-                        dateListener.onDateUnselected(clickedDate);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Select a new date.  Respects the {@link SelectionMode} this CalendarPickerView is configured
-     * with: if you are in {@link SelectionMode#SINGLE}, the previously selected date will be
-     * un-selected.  In {@link SelectionMode#MULTIPLE}, the new date will be added to the list of
-     * selected dates.
-     * <p/>
-     * If the selection was made (selectable date, in range), the view will scroll to the newly
-     * selected date if it's not already visible.
-     *
-     * @return - whether we were able to set the date
-     */
-    public boolean selectDate(Date date) {
-        return selectDate(date, false);
-    }
-
-    /**
-     * Select a new date.  Respects the {@link SelectionMode} this CalendarPickerView is configured
-     * with: if you are in {@link SelectionMode#SINGLE}, the previously selected date will be
-     * un-selected.  In {@link SelectionMode#MULTIPLE}, the new date will be added to the list of
-     * selected dates.
-     * <p/>
-     * If the selection was made (selectable date, in range), the view will scroll to the newly
-     * selected date if it's not already visible.
-     *
-     * @return - whether we were able to set the date
-     */
-    public boolean selectDate(Date date, boolean smoothScroll) {
-        validateDate(date);
-
-        MonthCellWithMonthIndex monthCellWithMonthIndex = getMonthCellWithIndexByDate(date);
-        if (monthCellWithMonthIndex == null || !isDateSelectable(date)) {
-            return false;
-        }
-        boolean wasSelected = doSelectDate(date, monthCellWithMonthIndex.cell);
-//        if (wasSelected) {
-//            scrollToSelectedMonth(monthCellWithMonthIndex.monthIndex, smoothScroll);
-//        }
-        return wasSelected;
-    }
-
-    private void validateDate(Date date) {
-        if (date == null) {
-            throw new IllegalArgumentException("Selected date must be non-null.");
-        }
-        if (date.before(minCal.getTime()) || date.after(maxCal.getTime())) {
-            throw new IllegalArgumentException(String.format(
-                    "SelectedDate must be between minDate and maxDate."
-                            + "%nminDate: %s%nmaxDate: %s%nselectedDate: %s", minCal.getTime(), maxCal.getTime(),
-                    date));
-        }
-    }
-
-    private boolean doSelectDate(Date date, MonthCellDescriptor cell) {
-        Calendar newlySelectedCal = Calendar.getInstance(locale);
-        newlySelectedCal.setTime(date);
-        // Sanitize input: clear out the hours/minutes/seconds/millis.
-        setMidnight(newlySelectedCal);
-
-        // Clear any remaining range state.
-        for (MonthCellDescriptor selectedCell : selectedCells) {
-            selectedCell.setRangeState(MonthCellDescriptor.RangeState.NONE);
-        }
-
-        switch (selectionMode) {
-            case RANGE:
-                if (selectedCals.size() > 1) {
-                    // We've already got a range selected: clear the old one.
-                    clearOldSelections();
-                } else if (selectedCals.size() == 1 && newlySelectedCal.before(selectedCals.get(0))) {
-                    // We're moving the start of the range back in time: clear the old start date.
-                    clearOldSelections();
-                }
-                break;
-
-            case MULTIPLE:
-                date = applyMultiSelect(date, newlySelectedCal);
-                break;
-
-            case SINGLE:
-                clearOldSelections();
-                break;
-            default:
-                throw new IllegalStateException("Unknown selectionMode " + selectionMode);
-        }
-
-        if (date != null) {
-            // Select a new cell.
-            if (selectedCells.size() == 0 || !selectedCells.get(0).equals(cell)) {
-                selectedCells.add(cell);
-                cell.setSelected(true);
-            }
-            selectedCals.add(newlySelectedCal);
-
-            if (selectionMode == SelectionMode.RANGE && selectedCells.size() > 1) {
-                // Select all days in between start and end.
-                Date start = selectedCells.get(0).getDate();
-                Date end = selectedCells.get(1).getDate();
-                selectedCells.get(0).setRangeState(MonthCellDescriptor.RangeState.FIRST);
-                selectedCells.get(1).setRangeState(MonthCellDescriptor.RangeState.LAST);
-
-                for (List<List<MonthCellDescriptor>> month : cells) {
-                    for (List<MonthCellDescriptor> week : month) {
-                        for (MonthCellDescriptor singleCell : week) {
-                            if (singleCell.getDate().after(start)
-                                    && singleCell.getDate().before(end)
-                                    && singleCell.isSelectable()) {
-                                singleCell.setSelected(true);
-                                singleCell.setRangeState(MonthCellDescriptor.RangeState.MIDDLE);
-                                selectedCells.add(singleCell);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Update the adapter.
-        validateAndUpdate();
-        return date != null;
-    }
-
-
-    private void clearOldSelections() {
-        for (MonthCellDescriptor selectedCell : selectedCells) {
-            // De-select the currently-selected cell.
-            selectedCell.setSelected(false);
-
-            if (dateListener != null) {
-                Date selectedDate = selectedCell.getDate();
-
-                if (selectionMode == SelectionMode.RANGE) {
-                    int index = selectedCells.indexOf(selectedCell);
-                    if (index == 0 || index == selectedCells.size() - 1) {
-                        dateListener.onDateUnselected(selectedDate);
-                    }
-                } else {
-                    dateListener.onDateUnselected(selectedDate);
-                }
-            }
-        }
-        selectedCells.clear();
-        selectedCals.clear();
-    }
-
-    private Date applyMultiSelect(Date date, Calendar selectedCal) {
-        for (MonthCellDescriptor selectedCell : selectedCells) {
-            if (selectedCell.getDate().equals(date)) {
-                // De-select the currently-selected cell.
-                selectedCell.setSelected(false);
-                selectedCells.remove(selectedCell);
-                date = null;
-                break;
-            }
-        }
-        for (Calendar cal : selectedCals) {
-            if (sameDate(cal, selectedCal)) {
-                selectedCals.remove(cal);
-                break;
-            }
-        }
-        return date;
-    }
-
-
-    public void highlightDates(Collection<Date> dates) {
-        for (Date date : dates) {
-            validateDate(date);
-
-            MonthCellWithMonthIndex monthCellWithMonthIndex = getMonthCellWithIndexByDate(date);
-            if (monthCellWithMonthIndex != null) {
-                Calendar newlyHighlightedCal = Calendar.getInstance();
-                newlyHighlightedCal.setTime(date);
-                MonthCellDescriptor cell = monthCellWithMonthIndex.cell;
-
-                highlightedCells.add(cell);
-                highlightedCals.add(newlyHighlightedCal);
-                cell.setHighlighted(true);
-            }
-        }
-
-        validateAndUpdate();
-    }
-
-    public void clearHighlightedDates() {
-        for (MonthCellDescriptor cal : highlightedCells) {
-            cal.setHighlighted(false);
-        }
-        highlightedCells.clear();
-        highlightedCals.clear();
-
-        validateAndUpdate();
+    private void scrollToCurMonth() {
+        MonthDescriptor todayDesc = new MonthDescriptor(
+                today.get(MONTH), today.get(YEAR), today.getTime(),
+                monthNameFormat.format(today.getTime()));
+        int index = months.indexOf(todayDesc) == -1 ? 0 :
+                months.indexOf(todayDesc);
+        calendarSlideView.setCurrentItem(index, false);
     }
 
     /**
@@ -793,6 +401,269 @@ public class CalendarSlideView extends ViewPager {
             }
         }
         return cells;
+    }
+
+
+    public class FluentInitializer {
+        /**
+         * Override the {@link SelectionMode} from the default ({@link SelectionMode#SINGLE}).
+         */
+        public FluentInitializer inMode(SelectionMode mode) {
+            selectionMode = mode;
+            validateAndUpdate();
+            return this;
+        }
+
+        /**
+         * Set an initially-selected date.  The calendar will scroll to that date if it's not already
+         * visible.
+         */
+        public FluentInitializer withSelectedDate(Date selectedDates) {
+            return withSelectedDates(Arrays.asList(selectedDates));
+        }
+
+        /**
+         * Set multiple selected dates.  This will throw an {@link IllegalArgumentException} if you
+         * pass in multiple dates and haven't already called {@link #inMode(SelectionMode)}.
+         */
+        public FluentInitializer withSelectedDates(Collection<Date> selectedDates) {
+            if (selectionMode == SelectionMode.SINGLE && selectedDates.size() > 1) {
+                throw new IllegalArgumentException("SINGLE mode can't be used with multiple selectedDates");
+            }
+            if (selectionMode == SelectionMode.RANGE && selectedDates.size() > 2) {
+                throw new IllegalArgumentException(
+                        "RANGE mode only allows two selectedDates.  You tried to pass " + selectedDates.size());
+            }
+            if (selectedDates != null) {
+                for (Date date : selectedDates) {
+                    selectDate(date);
+                }
+            }
+//            scrollToSelectedDates();
+
+            validateAndUpdate();
+
+            return this;
+        }
+
+        public FluentInitializer withHighlightedDates(Collection<Date> dates) {
+            highlightDates(dates);
+            return this;
+        }
+
+        public FluentInitializer withHighlightedDate(Date date) {
+            return withHighlightedDates(Arrays.asList(date));
+        }
+
+        @SuppressLint("SimpleDateFormat")
+        public FluentInitializer setShortWeekdays(String[] newShortWeekdays) {
+            DateFormatSymbols symbols = new DateFormatSymbols(locale);
+            symbols.setShortWeekdays(newShortWeekdays);
+            weekdayNameFormat =
+                    new SimpleDateFormat(getContext().getString(R.string.day_name_format), symbols);
+            return this;
+        }
+
+        public FluentInitializer displayOnly() {
+            displayOnly = true;
+            return this;
+        }
+    }
+
+    public void highlightDates(Collection<Date> dates) {
+        for (Date date : dates) {
+            validateDate(date);
+
+            MonthCellWithMonthIndex monthCellWithMonthIndex = getMonthCellWithIndexByDate(date);
+            if (monthCellWithMonthIndex != null) {
+                Calendar newlyHighlightedCal = Calendar.getInstance();
+                newlyHighlightedCal.setTime(date);
+                MonthCellDescriptor cell = monthCellWithMonthIndex.cell;
+
+                highlightedCells.add(cell);
+                highlightedCals.add(newlyHighlightedCal);
+                cell.setHighlighted(true);
+            }
+        }
+
+        validateAndUpdate();
+    }
+
+    /**
+     * Select a new date.  Respects the {@link SelectionMode} this CalendarPickerView is configured
+     * with: if you are in {@link SelectionMode#SINGLE}, the previously selected date will be
+     * un-selected.  In {@link SelectionMode#MULTIPLE}, the new date will be added to the list of
+     * selected dates.
+     * <p/>
+     * If the selection was made (selectable date, in range), the view will scroll to the newly
+     * selected date if it's not already visible.
+     *
+     * @return - whether we were able to set the date
+     */
+    public boolean selectDate(Date date) {
+        return selectDate(date, false);
+    }
+
+    /**
+     * Select a new date.  Respects the {@link SelectionMode} this CalendarPickerView is configured
+     * with: if you are in {@link SelectionMode#SINGLE}, the previously selected date will be
+     * un-selected.  In {@link SelectionMode#MULTIPLE}, the new date will be added to the list of
+     * selected dates.
+     * <p/>
+     * If the selection was made (selectable date, in range), the view will scroll to the newly
+     * selected date if it's not already visible.
+     *
+     * @return - whether we were able to set the date
+     */
+    public boolean selectDate(Date date, boolean smoothScroll) {
+        validateDate(date);
+
+        MonthCellWithMonthIndex monthCellWithMonthIndex = getMonthCellWithIndexByDate(date);
+        if (monthCellWithMonthIndex == null || !isDateSelectable(date)) {
+            return false;
+        }
+        boolean wasSelected = doSelectDate(date, monthCellWithMonthIndex.cell);
+//        if (wasSelected) {
+//            scrollToSelectedMonth(monthCellWithMonthIndex.monthIndex, smoothScroll);
+//        }
+        return wasSelected;
+    }
+
+
+    private void validateDate(Date date) {
+        if (date == null) {
+            throw new IllegalArgumentException("Selected date must be non-null.");
+        }
+        if (date.before(minCal.getTime()) || date.after(maxCal.getTime())) {
+            throw new IllegalArgumentException(String.format(
+                    "SelectedDate must be between minDate and maxDate."
+                            + "%nminDate: %s%nmaxDate: %s%nselectedDate: %s", minCal.getTime(), maxCal.getTime(),
+                    date));
+        }
+    }
+
+    private boolean doSelectDate(Date date, MonthCellDescriptor cell) {
+        Calendar newlySelectedCal = Calendar.getInstance(locale);
+        newlySelectedCal.setTime(date);
+        // Sanitize input: clear out the hours/minutes/seconds/millis.
+        setMidnight(newlySelectedCal);
+
+        // Clear any remaining range state.
+        for (MonthCellDescriptor selectedCell : selectedCells) {
+            selectedCell.setRangeState(MonthCellDescriptor.RangeState.NONE);
+        }
+
+        switch (selectionMode) {
+            case RANGE:
+                if (selectedCals.size() > 1) {
+                    // We've already got a range selected: clear the old one.
+                    clearOldSelections();
+                } else if (selectedCals.size() == 1 && newlySelectedCal.before(selectedCals.get(0))) {
+                    // We're moving the start of the range back in time: clear the old start date.
+                    clearOldSelections();
+                }
+                break;
+
+            case MULTIPLE:
+                date = applyMultiSelect(date, newlySelectedCal);
+                break;
+
+            case SINGLE:
+                clearOldSelections();
+                break;
+            default:
+                throw new IllegalStateException("Unknown selectionMode " + selectionMode);
+        }
+
+        if (date != null) {
+            // Select a new cell.
+            if (selectedCells.size() == 0 || !selectedCells.get(0).equals(cell)) {
+                selectedCells.add(cell);
+                cell.setSelected(true);
+            }
+            selectedCals.add(newlySelectedCal);
+
+            if (selectionMode == SelectionMode.RANGE && selectedCells.size() > 1) {
+                // Select all days in between start and end.
+                Date start = selectedCells.get(0).getDate();
+                Date end = selectedCells.get(1).getDate();
+                selectedCells.get(0).setRangeState(MonthCellDescriptor.RangeState.FIRST);
+                selectedCells.get(1).setRangeState(MonthCellDescriptor.RangeState.LAST);
+
+                for (List<List<MonthCellDescriptor>> month : cells) {
+                    for (List<MonthCellDescriptor> week : month) {
+                        for (MonthCellDescriptor singleCell : week) {
+                            if (singleCell.getDate().after(start)
+                                    && singleCell.getDate().before(end)
+                                    && singleCell.isSelectable()) {
+                                singleCell.setSelected(true);
+                                singleCell.setRangeState(MonthCellDescriptor.RangeState.MIDDLE);
+                                selectedCells.add(singleCell);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update the adapter.
+        validateAndUpdate();
+        return date != null;
+    }
+
+
+    private void validateAndUpdate() {
+        if (calendarSlideView.getAdapter() == null) {
+            calendarSlideView.setAdapter(adapter);
+        }
+        adapter.notifyDataSetChanged();
+    }
+
+    public Date getSelectedDate() {
+        return (selectedCals.size() > 0 ? selectedCals.get(0).getTime() : null);
+    }
+
+    /**
+     * Returns a string summarizing what the client sent us for init() params.
+     */
+    private static String dbg(Date minDate, Date maxDate) {
+        return "minDate: " + minDate + "\nmaxDate: " + maxDate;
+    }
+
+    /**
+     * Clears out the hours/minutes/seconds/millis of a Calendar.
+     */
+    static void setMidnight(Calendar cal) {
+        cal.set(HOUR_OF_DAY, 0);
+        cal.set(MINUTE, 0);
+        cal.set(SECOND, 0);
+        cal.set(MILLISECOND, 0);
+    }
+
+    private class CellClickedListener implements MonthView.Listener {
+        @Override
+        public void handleClick(MonthCellDescriptor cell) {
+            Date clickedDate = cell.getDate();
+
+            if (cellClickInterceptor != null && cellClickInterceptor.onCellClicked(clickedDate)) {
+                return;
+            }
+            if (!betweenDates(clickedDate, minCal, maxCal) || !isDateSelectable(clickedDate)) {
+                if (invalidDateListener != null) {
+                    invalidDateListener.onInvalidDateSelected(clickedDate);
+                }
+            } else {
+                boolean wasSelected = doSelectDate(clickedDate, cell);
+
+                if (dateListener != null) {
+                    if (wasSelected) {
+                        dateListener.onDateSelected(clickedDate);
+                    } else {
+                        dateListener.onDateUnselected(clickedDate);
+                    }
+                }
+            }
+        }
     }
 
     private boolean containsDate(List<Calendar> selectedCals, Date date) {
@@ -882,6 +753,78 @@ public class CalendarSlideView extends ViewPager {
         cellClickInterceptor = listener;
     }
 
+
+    private class CalendarSlideView extends ViewPager {
+
+        public CalendarSlideView(Context context) {
+            super(context);
+        }
+
+        public CalendarSlideView(Context context, AttributeSet attrs) {
+            super(context, attrs);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            if (months.isEmpty()) {
+                throw new IllegalStateException(
+                        "Must have at least one month to display.  Did you forget to call init()?");
+            }
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
+
+        private void scrollToCurMonth() {
+            MonthDescriptor todayDesc = new MonthDescriptor(
+                    today.get(MONTH), today.get(YEAR), today.getTime(),
+                    monthNameFormat.format(today.getTime()));
+            int index = months.indexOf(todayDesc) == -1 ? 0 :
+                    months.indexOf(todayDesc);
+            setCurrentItem(index, false);
+        }
+    }
+
+    private void clearOldSelections() {
+        for (MonthCellDescriptor selectedCell : selectedCells) {
+            // De-select the currently-selected cell.
+            selectedCell.setSelected(false);
+
+            if (dateListener != null) {
+                Date selectedDate = selectedCell.getDate();
+
+                if (selectionMode == SelectionMode.RANGE) {
+                    int index = selectedCells.indexOf(selectedCell);
+                    if (index == 0 || index == selectedCells.size() - 1) {
+                        dateListener.onDateUnselected(selectedDate);
+                    }
+                } else {
+                    dateListener.onDateUnselected(selectedDate);
+                }
+            }
+        }
+        selectedCells.clear();
+        selectedCals.clear();
+    }
+
+    private Date applyMultiSelect(Date date, Calendar selectedCal) {
+        for (MonthCellDescriptor selectedCell : selectedCells) {
+            if (selectedCell.getDate().equals(date)) {
+                // De-select the currently-selected cell.
+                selectedCell.setSelected(false);
+                selectedCells.remove(selectedCell);
+                date = null;
+                break;
+            }
+        }
+        for (Calendar cal : selectedCals) {
+            if (sameDate(cal, selectedCal)) {
+                selectedCals.remove(cal);
+                break;
+            }
+        }
+        return date;
+    }
+
+
     /**
      * Interface to be notified when a new date is selected or unselected. This will only be called
      * when the user initiates the date selection.  If you call {@link #selectDate(Date)} this
@@ -938,8 +881,9 @@ public class CalendarSlideView extends ViewPager {
 
     /***
      * 每个页面显示一个MonthView
+     * Adapter每次切换页面都强制重绘
      */
-    private class MonthAdapter extends PagerAdapter {
+    class MonthAdapter extends PagerAdapter {
         private final LayoutInflater inflater;
         private int mChildCount = 0;
 
@@ -984,6 +928,7 @@ public class CalendarSlideView extends ViewPager {
                     MonthView.create(container, inflater, weekdayNameFormat, listener, today, dividerColor,
                             dayBackgroundResId, dayTextColorResId, titleTextColor, displayHeader,
                             headerTextColor, decorators, locale);
+
             monthView.init(months.get(position), cells.get(position), displayOnly, titleTypeface,
                     dateTypeface);
 
@@ -994,12 +939,4 @@ public class CalendarSlideView extends ViewPager {
 
     }
 
-    private void scrollToCurMonth() {
-        MonthDescriptor todayDesc = new MonthDescriptor(
-                today.get(MONTH), today.get(YEAR), today.getTime(),
-                monthNameFormat.format(today.getTime()));
-        int index = months.indexOf(todayDesc) == -1 ? 0 :
-                months.indexOf(todayDesc);
-        setCurrentItem(index, false);
-    }
 }

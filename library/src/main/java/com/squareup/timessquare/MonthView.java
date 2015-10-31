@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class MonthView extends LinearLayout {
-    TextView title;
+    //    TextView title;
     CalendarGridView grid;
     private Listener listener;
     private List<CalendarCellDecorator> decorators;
@@ -91,7 +91,7 @@ public class MonthView extends LinearLayout {
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        title = (TextView) findViewById(R.id.title);
+//        title = (TextView) findViewById(R.id.title);
         grid = (CalendarGridView) findViewById(R.id.calendar_grid);
     }
 
@@ -99,7 +99,7 @@ public class MonthView extends LinearLayout {
                      boolean displayOnly, Typeface titleTypeface, Typeface dateTypeface) {
         Logr.d("Initializing MonthView (%d) for %s", System.identityHashCode(this), month);
         long start = System.currentTimeMillis();
-        title.setText(month.getLabel());
+//        title.setText(month.getLabel());
 
         final int numRows = cells.size();
         grid.setNumRows(numRows);
@@ -161,7 +161,7 @@ public class MonthView extends LinearLayout {
     }
 
     public void setTitleTextColor(int color) {
-        title.setTextColor(color);
+//        title.setTextColor(color);
     }
 
     public void setDisplayHeader(boolean displayHeader) {
@@ -174,5 +174,9 @@ public class MonthView extends LinearLayout {
 
     public interface Listener {
         void handleClick(MonthCellDescriptor cell);
+    }
+
+    public interface OnMonthChangedListener {
+        void onMonthChanged(String monthStr);
     }
 }
