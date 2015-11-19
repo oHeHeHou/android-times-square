@@ -28,7 +28,7 @@ public class SampleTimesSquareActivity extends Activity {
     private static final String TAG = "SampleTimesSquareActivity";
     private CalendarPickerView calendar;
   private AlertDialog theDialog;
-  private CalendarSlideView dialogView;
+    private CalendarPickerView dialogView;
   private final Set<Button> modeButtons = new LinkedHashSet<Button>();
 
   @Override protected void onCreate(Bundle savedInstanceState) {
@@ -177,7 +177,7 @@ public class SampleTimesSquareActivity extends Activity {
   }
 
   private void showCalendarInDialog(String title, int layoutResId) {
-    dialogView = (CalendarSlideView) getLayoutInflater().inflate(layoutResId, null, false);
+      dialogView = (CalendarPickerView) getLayoutInflater().inflate(layoutResId, null, false);
     theDialog = new AlertDialog.Builder(this) //
         .setTitle(title)
         .setView(dialogView)

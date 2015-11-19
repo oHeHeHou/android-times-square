@@ -15,6 +15,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.AbsListView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -753,6 +754,14 @@ public class CalendarPickerView extends LinearLayout {
         cellClickInterceptor = listener;
     }
 
+    public void fixDialogDimens() {
+        calendarSlideView.fixDialogDimens();
+    }
+
+    public void unfixDialogDimens() {
+        calendarSlideView.unfixDialogDimens();
+    }
+
 
     private class CalendarSlideView extends ViewPager {
 
@@ -764,6 +773,32 @@ public class CalendarPickerView extends LinearLayout {
             super(context, attrs);
         }
 
+        /**
+         * This method should only be called if the calendar is contained in a dialog, and it should only
+         * be called once, right after the dialog is shown (using
+         * {@link android.content.DialogInterface.OnShowListener} or
+         * {@link android.app.DialogFragment#onStart()}).
+         */
+        public void fixDialogDimens() {
+            Logr.d("Fixing dimensions to h = %d / w = %d", getMeasuredHeight(), getMeasuredWidth());
+            // Fix the layout height/width after the dialog has been shown.
+            getLayoutParams().height = getMeasuredHeight();
+            getLayoutParams().width = getMeasuredWidth();
+
+        }
+
+        /**
+         * This method should only be called if the calendar is contained in a dialog, and it should only
+         * be called when the screen has been rotated and the dialog should be re-measured.
+         */
+        public void unfixDialogDimens() {
+            Logr.d("Reset the fixed dimensions to allow for re-measurement");
+            // Fix the layout height/width after the dialog has been shown.
+            getLayoutParams().height = AbsListView.LayoutParams.MATCH_PARENT;
+            getLayoutParams().width = AbsListView.LayoutParams.MATCH_PARENT;
+            requestLayout();
+        }
+
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             if (months.isEmpty()) {
@@ -773,14 +808,6 @@ public class CalendarPickerView extends LinearLayout {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }
 
-        private void scrollToCurMonth() {
-            MonthDescriptor todayDesc = new MonthDescriptor(
-                    today.get(MONTH), today.get(YEAR), today.getTime(),
-                    monthNameFormat.format(today.getTime()));
-            int index = months.indexOf(todayDesc) == -1 ? 0 :
-                    months.indexOf(todayDesc);
-            setCurrentItem(index, false);
-        }
     }
 
     private void clearOldSelections() {
